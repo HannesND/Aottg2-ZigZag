@@ -353,7 +353,7 @@
 
 <!-- 에러 -->
 <div id="error-msg">
-  <div class="error-title">Data load failed</div>
+  <div class="error-title">Data load failed.</div>
   <div class="error-detail" id="error-detail"></div>
 </div>
 
@@ -363,7 +363,7 @@
   <header>
     <p class="game-label">AoTTG2 Custom Logic</p>
     <h1>ZIG<span>ZAG</span></h1>
-    <p class="sub" id="header-sub">OFFLINE RANKING</p>
+    <p class="sub" id="header-sub">RANKING</p>
   </header>
 
   <div class="stats">
@@ -392,7 +392,7 @@
   <div class="controls">
     <div class="search-wrap">
       <span class="search-icon">⌕</span>
-      <input type="text" id="search" placeholder="플레이어 검색..." autocomplete="off" spellcheck="false">
+      <input type="text" id="search" placeholder="Search Players..." autocomplete="off" spellcheck="false">
     </div>
     <div class="filter-btns">
       <button class="filter-btn active" data-filter="all">All</button>
@@ -413,7 +413,7 @@
       </thead>
       <tbody id="tbody"></tbody>
     </table>
-    <div class="no-results" id="no-results">Not found</div>
+    <div class="no-results" id="no-results">Not Found</div>
   </div>
 
   <footer>
@@ -496,13 +496,19 @@ async function loadCSV() {
     try {
       const res = await fetch(path);
       if (res.ok) {
-        const text = await res.text();
+        const buf  = await res.arrayBuffer();
+        const text = new TextDecoder('utf-8').decode(buf);
         return { text, filename: path };
       }
     } catch (_) { /* 다음 후보 시도 */ }
   }
   throw new Error(
-    'data/ranking.csv 파일을 찾을 수 없습니다.\n'
+    'data/ranking.csv 파일을 찾을 수 없습니다.\n\n' +
+    '저장소 구조를 확인하세요:\n' +
+    '  your-repo/\n' +
+    '  ├── index.html\n' +
+    '  └── data/\n' +
+    '      └── ranking.csv'
   );
 }
 
@@ -547,7 +553,7 @@ async function init() {
     // 날짜 헤더 업데이트
     const date = extractDateFromFilename(filename) || '';
     if (date) {
-      document.getElementById('header-sub').textContent = `RANKING · ${date}`;
+      document.getElementById('header-sub').textContent = `OFFLINE RANKING · ${date}`;
       document.getElementById('footer-date').textContent = date;
     }
 
