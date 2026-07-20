@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZigZag — Ranking Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0a0c0f;
+    --surface:   #11151b;
+    --border:    #1e2530;
+    --gold:      #e8c44a;
+    --silver:    #9baab8;
+    --bronze:    #b8714a;
+    --green:     #4ec48a;
+    --text:      #d4dce8;
+    --muted:     #6b7a8d;
+    --bar-base:  #1a2233;
+  }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── LOADING ── */
+  #loading {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    z-index: 100;
+    transition: opacity .4s;
+  }
+  #loading.hidden { opacity: 0; pointer-events: none; }
+
+  .spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid var(--border);
+    border-top-color: var(--green);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-text {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: .15em;
+  }
+
+  /* ── ERROR ── */
+  #error-msg {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 16px;
+    text-align: center;
+    padding: 40px;
+  }
+  #error-msg.show { display: flex; }
+  .error-title { font-family: 'Bebas Neue', sans-serif; font-size: 40px; color: #e05c5c; }
+  .error-detail { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--muted); max-width: 480px; line-height: 1.7; }
+
+  /* ── HEADER ── */
+  header {
+    position: relative;
+    padding: 56px 40px 40px;
+    text-align: center;
+    overflow: hidden;
+  }
+  header::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(ellipse 70% 60% at 50% 0%, rgba(78,196,138,.08) 0%, transparent 70%);
+    pointer-events: none;
+  }
+
+  .game-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: .2em;
+    text-transform: uppercase;
+    color: var(--green);
+    margin-bottom: 14px;
+    opacity: .8;
+  }
+
+  h1 {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: clamp(64px, 12vw, 110px);
+    letter-spacing: .04em;
+    line-height: 1;
+    color: #fff;
+    text-shadow: 0 0 60px rgba(78,196,138,.25);
+  }
+  h1 span { color: var(--green); }
+
+  .sub {
+    margin-top: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    color: var(--muted);
+    letter-spacing: .12em;
+  }
+
+  /* ── STATS ── */
+  .stats {
+    display: flex;
+    justify-content: center;
+    gap: 48px;
+    margin: 32px 40px 0;
+    padding: 20px;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .stat-item { text-align: center; }
+  .stat-num {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 32px;
+    color: var(--green);
+    line-height: 1;
+  }
+  .stat-label {
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    margin-top: 4px;
+  }
+
+  /* ── PODIUM ── */
+  .podium-section {
+    padding: 40px 40px 0;
+    max-width: 900px;
+    margin: 0 auto;
+  }
+  .podium {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 16px;
+  }
+  .podium-card {
+    flex: 1;
+    max-width: 260px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px 16px;
+    text-align: center;
+    overflow: hidden;
+    transition: transform .2s, border-color .2s;
+  }
+  .podium-card:hover { transform: translateY(-4px); }
+  .podium-card.p1 {
+    border-color: var(--gold);
+    box-shadow: 0 0 32px rgba(232,196,74,.12), inset 0 0 40px rgba(232,196,74,.04);
+    padding-top: 28px;
+    order: 2;
+  }
+  .podium-card.p2 { order: 1; }
+  .podium-card.p3 { order: 3; }
+  .podium-rank { font-family: 'Bebas Neue', sans-serif; font-size: 48px; line-height: 1; }
+  .p1 .podium-rank { color: var(--gold); font-size: 60px; }
+  .p2 .podium-rank { color: var(--silver); }
+  .p3 .podium-rank { color: var(--bronze); }
+  .podium-crown { font-size: 28px; display: block; margin-bottom: 4px; }
+  .podium-name { font-weight: 600; font-size: 15px; margin-top: 10px; word-break: break-word; color: #fff; }
+  .podium-time { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--muted); margin-top: 6px; }
+  .p1 .podium-time { color: var(--gold); }
+
+  /* ── CONTROLS ── */
+  .controls {
+    max-width: 960px;
+    margin: 40px auto 0;
+    padding: 0 40px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .search-wrap { position: relative; flex: 1; min-width: 200px; }
+  .search-icon {
+    position: absolute;
+    left: 12px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--muted);
+    font-size: 14px;
+    pointer-events: none;
+  }
+  #search {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 12px 10px 36px;
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    outline: none;
+    transition: border-color .2s;
+  }
+  #search:focus { border-color: var(--green); }
+  #search::placeholder { color: var(--muted); }
+
+  .filter-btns { display: flex; gap: 8px; }
+  .filter-btn {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 9px 14px;
+    color: var(--muted);
+    font-size: 12px;
+    font-family: 'Inter', sans-serif;
+    letter-spacing: .05em;
+    cursor: pointer;
+    transition: all .2s;
+    white-space: nowrap;
+  }
+  .filter-btn:hover, .filter-btn.active {
+    background: var(--green);
+    border-color: var(--green);
+    color: #0a0c0f;
+    font-weight: 600;
+  }
+
+  /* ── TABLE ── */
+  .table-wrap {
+    max-width: 960px;
+    margin: 20px auto 60px;
+    padding: 0 40px;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 10px 16px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+  }
+  tbody tr { transition: background .15s; }
+  tbody tr:hover td { background: rgba(78,196,138,.04); }
+  tbody tr:hover .bar-fill { opacity: .7; }
+  tbody td {
+    padding: 0 16px;
+    height: 48px;
+    border-bottom: 1px solid rgba(30,37,48,.7);
+    vertical-align: middle;
+    transition: background .15s;
+  }
+  .bar-cell { position: relative; padding: 0; }
+  .bar-fill {
+    position: absolute;
+    left: 0; top: 0;
+    height: 100%;
+    background: var(--bar-base);
+    transition: width .5s ease, opacity .15s;
+  }
+  .time-val {
+    position: relative;
+    z-index: 1;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    text-align: right;
+    padding: 0 16px;
+    color: var(--text);
+    white-space: nowrap;
+  }
+  .rank-col {
+    font-family: 'Bebas Neue', sans-serif;
+    font-size: 22px;
+    min-width: 52px;
+    width: 52px;
+  }
+  .rank-num { display: flex; align-items: center; gap: 6px; }
+  tr.r1 .rank-num { color: var(--gold); }
+  tr.r2 .rank-num { color: var(--silver); }
+  tr.r3 .rank-num { color: var(--bronze); }
+  .name-col { font-size: 14px; font-weight: 500; color: #c8d4e2; word-break: break-all; }
+  tr.r1 .name-col, tr.r2 .name-col, tr.r3 .name-col { color: #fff; }
+  .hl { color: var(--green); background: rgba(78,196,138,.15); border-radius: 2px; padding: 0 1px; }
+
+  .no-results {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--muted);
+    font-size: 14px;
+    display: none;
+  }
+
+  /* ── FOOTER ── */
+  footer {
+    text-align: center;
+    padding: 24px;
+    border-top: 1px solid var(--border);
+    font-size: 11px;
+    color: var(--muted);
+    letter-spacing: .08em;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* ── RESPONSIVE ── */
+  @media (max-width: 600px) {
+    header { padding: 40px 20px 28px; }
+    .stats { gap: 28px; margin: 24px 20px 0; }
+    .podium-section { padding: 32px 20px 0; }
+    .controls, .table-wrap { padding: 0 16px; }
+    .filter-btns { width: 100%; }
+    .filter-btn { flex: 1; text-align: center; }
+    .podium { gap: 8px; }
+    .podium-card { padding: 14px 10px; }
+    .podium-name { font-size: 13px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bar-fill, tbody tr, .podium-card { transition: none; }
+  }
+</style>
+</head>
+<body>
+
+<!-- 로딩 -->
+<div id="loading">
+  <div class="spinner"></div>
+  <div class="loading-text">LOADING RANKING DATA...</div>
+</div>
+
+<!-- 에러 -->
+<div id="error-msg">
+  <div class="error-title">Data load failed</div>
+  <div class="error-detail" id="error-detail"></div>
+</div>
+
+<!-- 메인 콘텐츠 (데이터 로드 후 표시) -->
+<div id="app" style="display:none">
+
+  <header>
+    <p class="game-label">AoTTG2 Custom Logic</p>
+    <h1>ZIG<span>ZAG</span></h1>
+    <p class="sub" id="header-sub">OFFLINE RANKING</p>
+  </header>
+
+  <div class="stats">
+    <div class="stat-item">
+      <div class="stat-num" id="stat-total">—</div>
+      <div class="stat-label">Players</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num" id="stat-best">—</div>
+      <div class="stat-label">Best Time</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num" id="stat-avg">—</div>
+      <div class="stat-label">Avg Time</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num" id="stat-sub10">—</div>
+      <div class="stat-label">Sub 10s</div>
+    </div>
+  </div>
+
+  <section class="podium-section">
+    <div class="podium" id="podium"></div>
+  </section>
+
+  <div class="controls">
+    <div class="search-wrap">
+      <span class="search-icon">⌕</span>
+      <input type="text" id="search" placeholder="플레이어 검색..." autocomplete="off" spellcheck="false">
+    </div>
+    <div class="filter-btns">
+      <button class="filter-btn active" data-filter="all">All</button>
+      <button class="filter-btn" data-filter="top25">TOP 25</button>
+      <button class="filter-btn" data-filter="sub10">Sub 10s</button>
+      <button class="filter-btn" data-filter="guest">GUEST</button>
+    </div>
+  </div>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th style="width:52px">#</th>
+          <th>Player</th>
+          <th style="width:180px; text-align:right">Time</th>
+        </tr>
+      </thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <div class="no-results" id="no-results">Not found</div>
+  </div>
+
+  <footer>
+    ZigZag Ranking · AoTTG2 · <span id="footer-date">—</span>
+    &nbsp;·&nbsp; Total <span id="footer-total">—</span> players
+  </footer>
+
+</div><!-- /#app -->
+
+<script>
+// ──────────────────────────────────────────────
+// CSV 파싱
+// 지원 포맷 A: rank,username,time (헤더 있음)
+// 지원 포맷 B: 원본 오프라인 포맷 (헤더 없음, 첫 줄 특수)
+// ──────────────────────────────────────────────
+function parseCSV(text) {
+  const lines = text.trim().split('\n').map(l => l.trim()).filter(Boolean);
+  if (lines.length === 0) throw new Error('CSV가 비어 있습니다.');
+
+  const first = lines[0];
+  const cols  = first.split(',');
+
+  // 포맷 A: 헤더가 rank,username,time 인 경우
+  if (cols[0].toLowerCase() === 'rank') {
+    return lines.slice(1).map(line => {
+      const parts = line.split(',');
+      return {
+        rank:     parseInt(parts[0], 10),
+        username: parts.slice(1, parts.length - 1).join(','), // 쉼표 포함 닉네임 대응
+        time:     parseFloat(parts[parts.length - 1])
+      };
+    }).filter(d => !isNaN(d.rank) && !isNaN(d.time));
+  }
+
+  // 포맷 B: 원본 오프라인 포맷 (첫 줄 "rank,name", 둘째 줄 "something,time", 이후 rank,name,time)
+  const rows = [];
+  let i = 0;
+
+  // 첫 줄: "N,Name" — 2컬럼
+  if (cols.length === 2) {
+    const secondCols = lines[1].split(',');
+    if (secondCols.length === 2) {
+      rows.push({ rank: parseInt(cols[0], 10), username: cols[1], time: parseFloat(secondCols[1]) });
+      i = 2;
+    }
+  }
+
+  for (; i < lines.length; i++) {
+    const parts = lines[i].split(',');
+    if (parts.length < 3) continue;
+    rows.push({
+      rank:     parseInt(parts[0], 10),
+      username: parts.slice(1, parts.length - 1).join(','),
+      time:     parseFloat(parts[parts.length - 1])
+    });
+  }
+
+  return rows.filter(d => !isNaN(d.rank) && !isNaN(d.time));
+}
+
+// ──────────────────────────────────────────────
+// CSV 파일명에서 날짜 추출 (YYYY-MM-DD 패턴)
+// ──────────────────────────────────────────────
+function extractDateFromFilename(filename) {
+  const m = filename.match(/(\d{4})[-_](\d{2})[-_](\d{2})/);
+  if (!m) return null;
+  return `${m[1]}.${m[2]}.${m[3]}`;
+}
+
+// ──────────────────────────────────────────────
+// data/ 폴더의 CSV 파일 자동 탐색
+// 우선순위: ranking.csv → 가장 최근 날짜 파일명
+// ──────────────────────────────────────────────
+const CSV_CANDIDATES = [
+  'data/ranking.csv',
+];
+
+async function loadCSV() {
+  for (const path of CSV_CANDIDATES) {
+    try {
+      const res = await fetch(path);
+      if (res.ok) {
+        const text = await res.text();
+        return { text, filename: path };
+      }
+    } catch (_) { /* 다음 후보 시도 */ }
+  }
+  throw new Error(
+    'data/ranking.csv 파일을 찾을 수 없습니다.\n'
+  );
+}
+
+// ──────────────────────────────────────────────
+// 유틸
+// ──────────────────────────────────────────────
+function fmtTime(t) {
+  if (t <= 0)  return 'N/A';
+  if (t < 60)  return t.toFixed(3) + 's';
+  const m = Math.floor(t / 60);
+  const s = (t % 60).toFixed(3).padStart(6, '0');
+  return `${m}m ${s}s`;
+}
+
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function highlight(text, q) {
+  if (!q) return esc(text);
+  const idx = text.toLowerCase().indexOf(q.toLowerCase());
+  if (idx < 0) return esc(text);
+  return esc(text.slice(0, idx))
+       + `<mark class="hl">${esc(text.slice(idx, idx + q.length))}</mark>`
+       + esc(text.slice(idx + q.length));
+}
+
+// ──────────────────────────────────────────────
+// 앱 초기화
+// ──────────────────────────────────────────────
+let DATA = [];
+
+async function init() {
+  try {
+    const { text, filename } = await loadCSV();
+    DATA = parseCSV(text);
+
+    if (DATA.length === 0) throw new Error('유효한 데이터가 없습니다.');
+
+    // 날짜 헤더 업데이트
+    const date = extractDateFromFilename(filename) || '';
+    if (date) {
+      document.getElementById('header-sub').textContent = `RANKING · ${date}`;
+      document.getElementById('footer-date').textContent = date;
+    }
+
+    // 로딩 숨기기 → 앱 표시
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('app').style.display = '';
+
+    buildStats();
+    buildPodium();
+    renderTable();
+    setupControls();
+
+    // 바 애니메이션
+    setTimeout(() => {
+      document.querySelectorAll('.bar-fill').forEach(el => {
+        const w = el.style.width;
+        el.style.width = '0';
+        requestAnimationFrame(() => { el.style.width = w; });
+      });
+    }, 50);
+
+  } catch (err) {
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('error-msg').classList.add('show');
+    document.getElementById('error-detail').textContent = err.message;
+  }
+}
+
+// ──────────────────────────────────────────────
+// 스탯
+// ──────────────────────────────────────────────
+function buildStats() {
+  const times   = DATA.filter(d => d.time > 0).map(d => d.time);
+  const avg     = times.reduce((a,b) => a+b, 0) / times.length;
+  const best    = DATA.find(d => d.time > 0);
+  const sub10   = times.filter(t => t < 10).length;
+
+  document.getElementById('stat-total').textContent = DATA.length;
+  document.getElementById('stat-best').textContent  = best ? fmtTime(best.time) : '—';
+  document.getElementById('stat-avg').textContent   = fmtTime(avg);
+  document.getElementById('stat-sub10').textContent = sub10;
+  document.getElementById('footer-total').textContent = DATA.length;
+}
+
+// ──────────────────────────────────────────────
+// 포디움
+// ──────────────────────────────────────────────
+function buildPodium() {
+  const top3    = DATA.slice(0, 3);
+  const classes = ['p1','p2','p3'];
+  const crowns  = ['👑','🥈','🥉'];
+  document.getElementById('podium').innerHTML = top3.map((d, i) => `
+    <div class="podium-card ${classes[i]}">
+      <span class="podium-crown">${crowns[i]}</span>
+      <div class="podium-rank">${d.rank}</div>
+      <div class="podium-name">${esc(d.username)}</div>
+      <div class="podium-time">${fmtTime(d.time)}</div>
+    </div>
+  `).join('');
+}
+
+// ──────────────────────────────────────────────
+// 테이블
+// ──────────────────────────────────────────────
+let currentFilter = 'all';
+let currentQuery  = '';
+
+function getFiltered() {
+  let rows = DATA;
+  if (currentFilter === 'top25')  rows = rows.filter(d => d.rank <= 25);
+  else if (currentFilter === 'sub10')  rows = rows.filter(d => d.time > 0 && d.time < 10);
+  else if (currentFilter === 'guest')  rows = rows.filter(d => /guest/i.test(d.username));
+  if (currentQuery) rows = rows.filter(d =>
+    d.username.toLowerCase().includes(currentQuery.toLowerCase())
+  );
+  return rows;
+}
+
+function rankClass(r) {
+  return r === 1 ? 'r1' : r === 2 ? 'r2' : r === 3 ? 'r3' : '';
+}
+
+function renderTable() {
+  const rows    = getFiltered();
+  const tbody   = document.getElementById('tbody');
+  const noR     = document.getElementById('no-results');
+  const times   = DATA.filter(d => d.time > 0).map(d => d.time);
+  const logMax  = Math.log1p(Math.max(...times));
+
+  if (rows.length === 0) {
+    tbody.innerHTML = '';
+    noR.style.display = 'block';
+    return;
+  }
+  noR.style.display = 'none';
+
+  tbody.innerHTML = rows.map(d => {
+    const barPct = d.time > 0 ? (Math.log1p(d.time) / logMax * 100).toFixed(1) : 0;
+    return `
+      <tr class="${rankClass(d.rank)}">
+        <td class="rank-col"><div class="rank-num">${d.rank}</div></td>
+        <td class="name-col">${highlight(d.username, currentQuery)}</td>
+        <td class="bar-cell">
+          <div class="bar-fill" style="width:${barPct}%"></div>
+          <div class="time-val">${fmtTime(d.time)}</div>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+// ──────────────────────────────────────────────
+// 컨트롤
+// ──────────────────────────────────────────────
+function setupControls() {
+  document.getElementById('search').addEventListener('input', e => {
+    currentQuery = e.target.value.trim();
+    renderTable();
+  });
+
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      currentFilter = btn.dataset.filter;
+      renderTable();
+    });
+  });
+}
+
+init();
+</script>
+</body>
+</html>
